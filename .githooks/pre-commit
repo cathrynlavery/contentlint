@@ -1,0 +1,28 @@
+#!/bin/bash
+# ContentLint Pre-Commit Hook
+# Lints staged markdown files before allowing commit
+
+# Get list of staged .md files
+STAGED_MD_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.md$')
+
+if [ -z "$STAGED_MD_FILES" ]; then
+    # No markdown files staged, allow commit
+    exit 0
+fi
+
+echo "Running ContentLint on staged markdown files..."
+
+# Run contentlint on each staged file
+python3 -m contentlint lint $STAGED_MD_FILES --fail-on FAIL
+
+LINT_EXIT_CODE=$?
+
+if [ $LINT_EXIT_CODE -ne 0 ]; then
+    echo ""
+    echo "❌ ContentLint found issues that need fixing."
+    echo "Fix the issues or use 'git commit --no-verify' to skip this check."
+    exit 1
+fi
+
+echo "✅ ContentLint passed!"
+exit 0

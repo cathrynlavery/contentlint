@@ -167,6 +167,148 @@ rules:
     threshold_count: 4
     window_words: 150
 
+  # ============================================================================
+  # G) Wikipedia AI Detection Patterns
+  # Based on Wikipedia's "Signs of AI writing" research
+  # These patterns appeared far more frequently after 2023 in AI-generated text
+  # ============================================================================
+
+  - id: ai-vocabulary
+    enabled: true
+    description: "Check for overuse of AI-specific vocabulary words"
+    category: ai-detection
+    # Words that appear far more frequently in post-2023 AI text
+    # Full list defined in code, customizable here
+    ai_words:
+      - additionally
+      - align
+      - aligned
+      - aligns
+      - crucial
+      - delve
+      - delved
+      - delves
+      - delving
+      - emphasizing
+      - emphasize
+      - emphasized
+      - enduring
+      - enhance
+      - enhanced
+      - enhances
+      - enhancing
+      - fostering
+      - foster
+      - fostered
+      - garner
+      - garnered
+      - garnering
+      - highlight
+      - highlighted
+      - highlighting
+      - highlights
+      - interplay
+      - intricate
+      - intricacies
+      - landscape
+      - pivotal
+      - showcase
+      - showcased
+      - showcases
+      - showcasing
+      - tapestry
+      - testament
+      - underscore
+      - underscored
+      - underscores
+      - underscoring
+      - valuable
+      - vibrant
+    # Thresholds per 1,000 words
+    fail_threshold_per_1000: 5
+    warn_threshold_per_1000: 3
+    # Also warn if 3+ different AI words appear (clustering effect)
+    cluster_threshold: 3
+
+  - id: significance-language
+    enabled: true
+    description: "Check for AI patterns overemphasizing significance and legacy"
+    category: ai-detection
+    # LLMs add statements about how topics represent broader significance
+    # Using distinct phrases like "stands as testament", "pivotal moment"
+    threshold_count: 2  # WARN at 2, FAIL at 4
+
+  - id: promotional-language
+    enabled: true
+    description: "Check for promotional and advertisement-like language"
+    category: ai-detection
+    # LLMs insert promotional language like "boasts", "nestled", "vibrant"
+    # even when prompted for neutral encyclopedic tone
+    threshold_count: 2  # WARN at 2, FAIL at 4
+
+  - id: superficial-analysis
+    enabled: true
+    description: "Check for superficial analysis with trailing -ing phrases"
+    category: ai-detection
+    # AI inserts empty analysis by attaching present participle phrases
+    # like ", highlighting its importance" or ", ensuring quality"
+    threshold_count: 3  # WARN at 3, FAIL at 5
+
+  - id: copulative-avoidance
+    enabled: true
+    description: "Check for avoiding simple 'is/are' constructions"
+    category: ai-detection
+    # LLMs substitute "serves as" for "is", "features" for "has"
+    # to sound more formal but less natural
+    threshold_count: 3  # WARN at 3+
+
+  - id: negative-parallelism
+    enabled: true
+    description: "Check for negative parallelisms (not only...but, not just...it's)"
+    category: ai-detection
+    # LLMs use these constructions to appear balanced and thoughtful
+    # Each instance is quite distinctive, so we report them individually
+
+  - id: rule-of-three
+    enabled: true
+    description: "Check for overuse of 'rule of three' pattern"
+    category: ai-detection
+    # LLMs overuse "adjective, adjective, and adjective" patterns
+    # to make superficial analyses appear comprehensive
+    threshold_count: 3  # WARN at 3+
+
+  - id: challenges-conclusions
+    enabled: true
+    description: "Check for formulaic challenges/conclusions sections"
+    category: ai-detection
+    # LLMs add "Despite its [positive], [subject] faces challenges..."
+    # followed by vaguely positive future assessments
+    # WARN at 1, FAIL at 2+
+
+  - id: knowledge-cutoff
+    enabled: true
+    description: "Check for knowledge-cutoff disclaimers"
+    category: ai-detection
+    # LLMs add disclaimers like "as of my last update" or
+    # "specific details are limited" even when fabricating this
+    # Each instance is distinctive, report individually as FAIL
+
+  - id: vague-attribution
+    enabled: true
+    description: "Check for vague attributions and weasel wording"
+    category: ai-detection
+    # AI attributes claims to vague authorities like "observers note"
+    # or "experts argue" without specific citations
+    threshold_count: 2  # WARN at 2+
+
+  - id: notability-emphasis
+    enabled: true
+    description: "Check for overemphasis on notability and media coverage"
+    category: ai-detection
+    # LLMs list sources and outlets to "prove" notability
+    # using Wikipedia-specific language like "independent coverage"
+    threshold_count: 2  # WARN at 2+
+
 # Directory-specific overrides (optional)
 # These allow you to have different thresholds for different content types
 overrides:

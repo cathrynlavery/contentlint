@@ -1,8 +1,8 @@
 # ContentLint
 
-**ESLint for writing** - A deterministic linter that scans content files and flags AI-tells, weak prose patterns, and writing quality issues.
+**ESLint for writing** - A deterministic linter that scans content files and flags AI-generated content patterns, based on Wikipedia's research into AI writing detection.
 
-ContentLint helps you maintain high-quality content by automatically detecting common writing problems that make content feel generic, AI-generated, or poorly crafted.
+ContentLint helps you maintain high-quality, human-written content by automatically detecting the distinctive patterns that appear in AI-generated text. Built on patterns documented in [Wikipedia's "Signs of AI writing" guide](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing), which catalogs observations from thousands of instances of AI-generated text.
 
 ## Features
 
@@ -54,32 +54,228 @@ contentlint init
 
 ## What ContentLint Detects
 
-### A) Word Choice & Filler Words
+ContentLint implements two categories of checks:
+
+1. **Wikipedia AI Detection Patterns** - Distinctive patterns that appeared in text after late 2023, based on rigorous linguistic research
+2. **General Writing Quality Rules** - Traditional writing quality checks for clarity and conciseness
+
+### Wikipedia AI Detection Patterns
+
+These patterns are based on Wikipedia's extensive documentation of AI writing tells, observed across thousands of instances.
+
+#### A) AI Vocabulary Overuse
+
+Detects words that appear far more frequently in AI-generated text than in human writing:
+
+**Most distinctive AI words:**
+- **delve** - Famously overused by ChatGPT in 2023-2024
+- **underscore, underscored, underscoring** - Used as verb meaning "emphasize"
+- **tapestry** - Used abstractly (e.g., "rich tapestry of culture")
+- **pivotal** - Overused for significance
+- **landscape** - Used abstractly (e.g., "the technological landscape")
+- **testament** - In phrases like "stands as a testament"
+- **vibrant** - Promotional descriptor
+- **fostering, cultivate** - Used figuratively
+- **showcase, showcasing** - Promotional verb
+- **intricate, intricacies** - Empty sophistication marker
+
+**Additional AI vocabulary:**
+- additionally, align/aligned, crucial, emphasizing, enduring, enhance, garner, highlight, interplay, valuable
+
+**Detection logic:**
+- FAIL if > 5 per 1,000 words
+- WARN if > 3 per 1,000 words
+- WARN if 3+ different AI words appear (clustering effect)
+
+#### B) Significance/Legacy Language
+
+Detects AI's tendency to overemphasize significance using distinctive phrases:
+
+**Common patterns:**
+- "stands as a testament to"
+- "serves as a reminder"
+- "plays a pivotal/crucial/vital role"
+- "underscores its importance/significance"
+- "enduring legacy/impact"
+- "reflects broader trends"
+- "contributing to the broader"
+- "deeply rooted in"
+- "indelible mark"
+- "setting the stage for"
+
+**Why this matters:** LLMs add these even for mundane subjects, constantly reminding readers of importance while the actual content becomes vaguer.
+
+**Thresholds:**
+- WARN if 2+ instances
+- FAIL if 4+ instances
+
+#### C) Promotional Language
+
+Detects advertisement-like puffery that LLMs add even when prompted for neutral tone:
+
+**Common patterns:**
+- "boasts a" (instead of "has a")
+- "nestled in the heart of"
+- "vibrant/rich cultural heritage"
+- "natural beauty", "breathtaking views"
+- "renowned for", "celebrated as"
+- "commitment to excellence"
+- "groundbreaking/revolutionary" (used loosely)
+- "clean and modern", "state-of-the-art"
+
+**Thresholds:**
+- WARN if 2+ instances
+- FAIL if 4+ instances
+
+#### D) Superficial Analysis
+
+Detects empty commentary added via trailing present participle (-ing) phrases:
+
+**Common patterns:**
+- ", highlighting the importance of"
+- ", underscoring its significance"
+- ", emphasizing the need for"
+- ", ensuring quality"
+- ", fostering innovation"
+- ", reflecting the broader"
+- ", contributing to"
+
+**Why this matters:** These add no actual analysis, just noise that makes text sound more "thoughtful."
+
+**Thresholds:**
+- WARN if 3+ instances
+- FAIL if 5+ instances
+
+#### E) Copulative Avoidance
+
+Detects AI's tendency to avoid simple "is/are" and "has/have" constructions:
+
+**Patterns:**
+- "serves as a" instead of "is a"
+- "stands as a" instead of "is a"
+- "features a/numerous" instead of "has"
+- "offers a" instead of "has"
+- "holds the distinction of" instead of "is"
+
+**Why this matters:** A study documented over 10% decrease in "is/are" usage in academic writing in 2023, with no prior changes.
+
+**Threshold:** WARN if 3+ instances
+
+#### F) Negative Parallelisms
+
+Detects formulaic "balanced" constructions common in AI writing:
+
+**Patterns:**
+- "not only...but also..."
+- "not just about...it's about..."
+- "it's not...it's..." (across sentences)
+- "no...no...just..."
+- "not...rather, it..."
+
+**Why distinctive:** Each instance is reported individually as these are quite formulaic.
+
+#### G) Rule of Three Overuse
+
+Detects excessive use of three-part lists:
+
+**Patterns:**
+- "adjective, adjective, and adjective approach/method/system"
+- Repetitive three-part phrase structures
+
+**Why this matters:** LLMs overuse this rhetorical device to make superficial analysis appear comprehensive.
+
+**Threshold:** WARN if 3+ instances
+
+#### H) Challenges/Conclusions Sections
+
+Detects formulaic outline-style conclusions:
+
+**Patterns:**
+- "Despite its [positive words], [subject] faces challenges..."
+- "Despite these challenges, [subject] continues to thrive"
+- Section titles: "Challenges and Legacy", "Future Outlook"
+- "Future investments/initiatives could enhance..."
+
+**Why distinctive:** Very formulaic AI pattern, especially common in Wikipedia-style articles.
+
+**Thresholds:**
+- WARN if 1 instance
+- FAIL if 2+ instances
+
+#### I) Knowledge Cutoff Disclaimers
+
+Detects AI disclaimers and speculation about missing information:
+
+**Patterns:**
+- "as of my last knowledge update"
+- "up to my last training update"
+- "specific details are limited/not widely documented"
+- "not extensively documented in available sources"
+- "maintains a low profile", "keeps personal details private"
+
+**Why this is FAIL-worthy:** These are often completely fabricated claims. AI will say "details are limited" even when it's just making things up.
+
+Each instance reported individually as FAIL.
+
+#### J) Vague Attribution/Weasel Wording
+
+Detects uncited claims attributed to vague authorities:
+
+**Patterns:**
+- "Observers have noted/cited"
+- "Experts argue/suggest"
+- "Industry reports indicate"
+- "Some critics/sources argue"
+- "Several publications have described"
+- "Has been described as" (without source)
+
+**Threshold:** WARN if 2+ instances
+
+#### K) Notability Overemphasis
+
+Detects AI's tendency to "prove" notability by listing media coverage:
+
+**Patterns:**
+- "independent coverage" (Wikipedia-specific language)
+- "featured in [outlet], [outlet], and other prominent media outlets"
+- "local/regional/national media outlets"
+- "maintains an active social media presence"
+- "written by a leading expert"
+
+**Why distinctive:** Uses Wikipedia's own notability guidelines language, but in article text rather than talk pages.
+
+**Threshold:** WARN if 2+ instances
+
+---
+
+### General Writing Quality Rules
+
+#### Word Choice & Filler Words
 
 Detects overuse of weak, filler words that dilute your message:
 - **Banned words**: just, that, really, actually, pretty, very, etc.
 - **Thresholds**: FAIL if > 3 per 1,000 words; WARN if 2-3 per 1,000 words
 
-### B) Weak Phrases
+#### Weak Phrases
 
 Flags hedging phrases that undermine authority:
 - "I think", "I believe", "it seems", "in my opinion"
 - FAIL if used in assertive contexts (with claim verbs like "is", "causes", "shows")
 
-### C) Adverbs
+#### Adverbs
 
 Monitors -ly adverb usage:
 - WARN if > 8 per 1,000 words
 - FAIL if > 15 per 1,000 words
 - Always FAIL on stacked intensifiers: "really very quickly", "extremely clearly"
 
-### D) Transitions (AI Cadence)
+#### Transitions
 
-Detects overuse of formal transitions that signal AI writing:
+Detects overuse of formal transitions:
 - "moreover", "furthermore", "in addition", "however", "on the other hand"
 - WARN if > 4 per 1,000 words
 
-### E) Sentence Mechanics
+#### Sentence Mechanics
 
 **Conjunction Starts:**
 - WARN if > 20% of sentences start with And/But/So/Because/However
@@ -90,15 +286,15 @@ Detects overuse of formal transitions that signal AI writing:
 
 **Sentence Length Variance (Burstiness):**
 - WARN if 70%+ of sentences fall within a 10-word band
-- Helps detect monotonous, AI-like rhythm
+- Helps detect monotonous rhythm
 
-### F) Passive Voice
+#### Passive Voice
 
 Uses heuristics to detect passive constructions:
 - Patterns like "was implemented", "were created", "is shown"
 - WARN if > 12% of sentences are passive (configurable)
 
-### G) Repetition
+#### Repetition
 
 Flags repeated non-stopwords within paragraphs:
 - WARN if any word repeats > 4 times within 150 words

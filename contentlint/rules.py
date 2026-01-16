@@ -546,10 +546,614 @@ class RepetitionChecker(RuleChecker):
         return findings
 
 
+class AIVocabularyChecker(RuleChecker):
+    """Check for overuse of AI-specific vocabulary words identified by Wikipedia.
+
+    These words appear far more frequently in AI-generated text after 2023
+    compared to human-written text from before 2023.
+    """
+
+    # Default AI vocabulary from Wikipedia research
+    DEFAULT_AI_WORDS = [
+        'additionally', 'align', 'aligned', 'aligns', 'crucial', 'delve', 'delved', 'delves', 'delving',
+        'emphasizing', 'emphasize', 'emphasized', 'enduring', 'enhance', 'enhanced', 'enhances',
+        'enhancing', 'fostering', 'foster', 'fostered', 'garner', 'garnered', 'garnering',
+        'highlight', 'highlighted', 'highlighting', 'highlights', 'interplay', 'intricate',
+        'intricacies', 'landscape', 'pivotal', 'showcase', 'showcased', 'showcases', 'showcasing',
+        'tapestry', 'testament', 'underscore', 'underscored', 'underscores', 'underscoring',
+        'valuable', 'vibrant'
+    ]
+
+    def check(self, text: str, raw_text: str, file_path: str, metadata: Dict[str, Any]) -> List[Finding]:
+        findings = []
+        words = tokenize_words(text)
+        total_words = len(words)
+
+        if total_words == 0:
+            return findings
+
+        ai_words = self.config.get('ai_words', self.DEFAULT_AI_WORDS)
+        fail_threshold = self.config.get('fail_threshold_per_1000', 5)
+        warn_threshold = self.config.get('warn_threshold_per_1000', 3)
+        cluster_threshold = self.config.get('cluster_threshold', 3)
+
+        word_counts = Counter(words)
+
+        # Count total AI vocabulary usage
+        total_ai_count = 0
+        detected_ai_words = []
+
+        for ai_word in ai_words:
+            count = word_counts.get(ai_word.lower(), 0)
+            if count > 0:
+                total_ai_count += count
+                detected_ai_words.append((ai_word, count))
+
+        rate = words_per_thousand(total_ai_count, total_words)
+
+        # Check if we hit thresholds
+        if rate > fail_threshold:
+            severity = 'FAIL'
+        elif rate > warn_threshold:
+            severity = 'WARN'
+        elif len(detected_ai_words) >= cluster_threshold:
+            # Even below threshold, flag if 3+ different AI words appear (clustering effect)
+            severity = 'WARN'
+        else:
+            return findings
+
+        # Find first occurrence for snippet
+        for ai_word, count in detected_ai_words:
+            pattern = re.compile(r'\b' + re.escape(ai_word) + r'\b', re.IGNORECASE)
+            match = pattern.search(text)
+            if match:
+                snippet = get_context_snippet(text, match.start(), match.end())
+                line = calculate_line_number(raw_text, match.start())
+
+                word_list = ', '.join([f"'{w}' ({c}x)" for w, c in detected_ai_words[:5]])
+                findings.append(Finding(
+                    rule_id=self.rule_id,
+                    severity=severity,
+                    message=f"AI vocabulary detected: {total_ai_count} occurrences ({rate:.1f} per 1,000 words). Words: {word_list}",
+                    file_path=file_path,
+                    snippet=snippet,
+                    line=line,
+                    details={
+                        'total_count': total_ai_count,
+                        'rate': rate,
+                        'detected_words': detected_ai_words[:10]
+                    }
+                ))
+                break
+
+        return findings
+
+
+class SignificanceLanguageChecker(RuleChecker):
+    """Check for AI patterns that overemphasize significance, legacy, and broader trends.
+
+    LLMs tend to add statements about how topics represent or contribute to broader
+    significance, using a distinct repertoire of phrases.
+    """
+
+    DEFAULT_PATTERNS = [
+        # "stands/serves as" patterns
+        r'\b(stands?|serves?|marks?|represents?)\s+(as\s+)?a\s+(testament|reminder|symbol|pivotal|crucial|vital|significant|key)\b',
+        # Significance/importance emphasis
+        r'\b(underscores?|highlights?|emphasizes?|symbolizes?)\s+(its|their|the)\s+(importance|significance|role|impact|legacy)\b',
+        r'\bplays?\s+a\s+(vital|significant|crucial|pivotal|key)\s+(role|part)\b',
+        # Legacy and enduring patterns
+        r'\b(enduring|lasting|ongoing|continued)\s+(legacy|significance|impact|relevance|importance)\b',
+        # Broader context patterns
+        r'\b(reflects?|represents?|symbolizes?)\s+(broader|wider|larger)\s+(trends?|movements?|contexts?|patterns?)\b',
+        # Contributing to patterns
+        r'\b(contribut(es?|ing)|contribut(es?|ed))\s+to\s+the\s+(broader|wider|larger|overall)\b',
+        # Setting the stage/marking patterns
+        r'\b(setting\s+the\s+stage|marking|shaping)\s+(the|a)\b',
+        # Deeply rooted
+        r'\b(deeply|firmly)\s+(rooted|embedded|ingrained)\b',
+        # Focal point, indelible mark
+        r'\b(focal\s+point|indelible\s+mark|key\s+turning\s+point|pivotal\s+moment)\b',
+    ]
+
+    def check(self, text: str, raw_text: str, file_path: str, metadata: Dict[str, Any]) -> List[Finding]:
+        findings = []
+        patterns = self.config.get('patterns', self.DEFAULT_PATTERNS)
+        threshold = self.config.get('threshold_count', 2)
+
+        all_matches = []
+
+        for pattern_str in patterns:
+            pattern = re.compile(pattern_str, re.IGNORECASE)
+            matches = list(pattern.finditer(text))
+            all_matches.extend(matches)
+
+        if len(all_matches) >= threshold:
+            # Report on first match
+            match = all_matches[0]
+            snippet = get_context_snippet(text, match.start(), match.end())
+            line = calculate_line_number(raw_text, match.start())
+
+            severity = 'FAIL' if len(all_matches) >= 4 else 'WARN'
+
+            findings.append(Finding(
+                rule_id=self.rule_id,
+                severity=severity,
+                message=f"Overemphasis on significance/legacy: {len(all_matches)} instances of AI significance language",
+                file_path=file_path,
+                snippet=snippet,
+                line=line,
+                details={'count': len(all_matches)}
+            ))
+
+        return findings
+
+
+class PromotionalLanguageChecker(RuleChecker):
+    """Check for promotional and advertisement-like language common in AI text.
+
+    LLMs have serious problems keeping a neutral tone, especially when writing
+    about cultural heritage, adding promotional language even when prompted for
+    encyclopedic tone.
+    """
+
+    DEFAULT_PATTERNS = [
+        # Boasts/features patterns
+        r'\b(boasts?|features?|offers?|showcases?)\s+a\b',
+        # Descriptive puffery
+        r'\b(vibrant|rich|profound|breathtaking|stunning|remarkable|exceptional|outstanding)\s+(culture|heritage|landscape|history|tradition|community)\b',
+        # Enhancing patterns
+        r'\b(enhancing|enriching|elevating)\s+(its|their|the)\b',
+        # Natural beauty
+        r'\b(natural\s+beauty|scenic\s+landscapes?|breathtaking\s+views?)\b',
+        # Nestled/located patterns
+        r'\b(nestled|situated|located)\s+(in\s+the\s+heart\s+of|within|amidst)\b',
+        # Groundbreaking
+        r'\b(groundbreaking|revolutionary|pioneering|innovative)\s+(work|research|approach|method)\b',
+        # Renowned
+        r'\b(renowned|celebrated|acclaimed|distinguished|esteemed)\s+(for|as)\b',
+        # Commitment to
+        r'\b(commitment|dedication)\s+to\s+(excellence|quality|sustainability|innovation)\b',
+        # Clean and modern
+        r'\b(clean\s+and\s+modern|state-of-the-art|world-class|cutting-edge)\b',
+    ]
+
+    def check(self, text: str, raw_text: str, file_path: str, metadata: Dict[str, Any]) -> List[Finding]:
+        findings = []
+        patterns = self.config.get('patterns', self.DEFAULT_PATTERNS)
+        threshold = self.config.get('threshold_count', 2)
+
+        all_matches = []
+
+        for pattern_str in patterns:
+            pattern = re.compile(pattern_str, re.IGNORECASE)
+            matches = list(pattern.finditer(text))
+            all_matches.extend(matches)
+
+        if len(all_matches) >= threshold:
+            match = all_matches[0]
+            snippet = get_context_snippet(text, match.start(), match.end())
+            line = calculate_line_number(raw_text, match.start())
+
+            severity = 'FAIL' if len(all_matches) >= 4 else 'WARN'
+
+            findings.append(Finding(
+                rule_id=self.rule_id,
+                severity=severity,
+                message=f"Promotional language detected: {len(all_matches)} instances of puffery/marketing language",
+                file_path=file_path,
+                snippet=snippet,
+                line=line,
+                details={'count': len(all_matches)}
+            ))
+
+        return findings
+
+
+class SuperficialAnalysisChecker(RuleChecker):
+    """Check for superficial analysis patterns with trailing -ing phrases.
+
+    AI chatbots tend to insert superficial analysis by attaching present participle
+    phrases at the end of sentences, often with vague attributions.
+    """
+
+    DEFAULT_PATTERNS = [
+        # Trailing -ing phrases about significance
+        r',\s+(highlighting|underscoring|emphasizing|demonstrating|illustrating|showcasing|reflecting|symbolizing)\s+(the|its|their)\s+(importance|significance|impact|role|value|legacy)\b',
+        # Ensuring/cultivating patterns
+        r',\s+(ensuring|cultivating|fostering|promoting|enabling|facilitating)\s+\w+',
+        # Contributing to patterns
+        r',\s+(contributing\s+to|reflecting|symbolizing)\s+\w+',
+        # Encompassing patterns
+        r',\s+(encompassing|spanning|including)\s+\w+',
+        # Aligning/resonating patterns
+        r',\s+(aligning|resonating)\s+with\b',
+    ]
+
+    def check(self, text: str, raw_text: str, file_path: str, metadata: Dict[str, Any]) -> List[Finding]:
+        findings = []
+        patterns = self.config.get('patterns', self.DEFAULT_PATTERNS)
+        threshold = self.config.get('threshold_count', 3)
+
+        all_matches = []
+
+        for pattern_str in patterns:
+            pattern = re.compile(pattern_str, re.IGNORECASE)
+            matches = list(pattern.finditer(text))
+            all_matches.extend(matches)
+
+        if len(all_matches) >= threshold:
+            match = all_matches[0]
+            snippet = get_context_snippet(text, match.start(), match.end())
+            line = calculate_line_number(raw_text, match.start())
+
+            severity = 'FAIL' if len(all_matches) >= 5 else 'WARN'
+
+            findings.append(Finding(
+                rule_id=self.rule_id,
+                severity=severity,
+                message=f"Superficial analysis detected: {len(all_matches)} trailing -ing phrases adding empty commentary",
+                file_path=file_path,
+                snippet=snippet,
+                line=line,
+                details={'count': len(all_matches)}
+            ))
+
+        return findings
+
+
+class CopulativeAvoidanceChecker(RuleChecker):
+    """Check for AI's tendency to avoid simple 'is/are' constructions.
+
+    LLMs often substitute 'serves as' for 'is', 'features' for 'has', making
+    text sound more formal but less natural.
+    """
+
+    DEFAULT_PATTERNS = [
+        # Serves as / stands as patterns (when simple "is" would work)
+        r'\b(serves?|stands?)\s+as\s+(a|an|the)\s+\w+',
+        # Features/offers instead of has
+        r'\b(features?|offers?)\s+(a|an|the|numerous|several|many)\s+\w+',
+        # Marks/represents instead of is
+        r'\b(marks?|represents?)\s+(a|an|the)\s+(shift|change|transition|milestone)\b',
+        # Holds the distinction
+        r'\bholds?\s+the\s+(distinction|position|role)\b',
+    ]
+
+    def check(self, text: str, raw_text: str, file_path: str, metadata: Dict[str, Any]) -> List[Finding]:
+        findings = []
+        patterns = self.config.get('patterns', self.DEFAULT_PATTERNS)
+        threshold = self.config.get('threshold_count', 3)
+
+        all_matches = []
+
+        for pattern_str in patterns:
+            pattern = re.compile(pattern_str, re.IGNORECASE)
+            matches = list(pattern.finditer(text))
+            all_matches.extend(matches)
+
+        if len(all_matches) >= threshold:
+            match = all_matches[0]
+            snippet = get_context_snippet(text, match.start(), match.end())
+            line = calculate_line_number(raw_text, match.start())
+
+            findings.append(Finding(
+                rule_id=self.rule_id,
+                severity='WARN',
+                message=f"Copulative avoidance: {len(all_matches)} instances of 'serves as/features' instead of 'is/has'",
+                file_path=file_path,
+                snippet=snippet,
+                line=line,
+                details={'count': len(all_matches)}
+            ))
+
+        return findings
+
+
+class NegativeParallelismChecker(RuleChecker):
+    """Check for negative parallelisms common in AI writing.
+
+    Parallel constructions involving 'not', 'but', or 'however' such as
+    'Not only...but...' or 'It is not just about...it's...' are common in
+    LLM writing to appear balanced and thoughtful.
+    """
+
+    DEFAULT_PATTERNS = [
+        # Not only...but patterns
+        r'\bnot\s+only\s+\w+[\w\s,]+but\s+(also\s+)?\w+',
+        # Not just/merely...but patterns
+        r'\bnot\s+(just|merely|simply)\s+\w+[\w\s,]+but\s+\w+',
+        # It's not...it's patterns
+        r"\bit'?s\s+not\s+\w+[\w\s,]+it'?s\s+\w+",
+        # No...no...just patterns
+        r'\bno\s+\w+,\s+no\s+\w+,\s+just\s+\w+',
+        # Not...rather patterns
+        r'\bnot\s+\w+[\w\s,]+\.\s+[Rr]ather,?\s+(it|this)\s+(is|constitutes|represents)\b',
+    ]
+
+    def check(self, text: str, raw_text: str, file_path: str, metadata: Dict[str, Any]) -> List[Finding]:
+        findings = []
+        patterns = self.config.get('patterns', self.DEFAULT_PATTERNS)
+
+        all_matches = []
+
+        for pattern_str in patterns:
+            pattern = re.compile(pattern_str, re.IGNORECASE)
+            matches = list(pattern.finditer(text))
+            all_matches.extend(matches)
+
+        # Report each instance (these are quite distinctive)
+        for match in all_matches[:3]:  # Limit to first 3
+            snippet = get_context_snippet(text, match.start(), match.end())
+            line = calculate_line_number(raw_text, match.start())
+
+            findings.append(Finding(
+                rule_id=self.rule_id,
+                severity='WARN',
+                message=f"Negative parallelism detected: '{match.group()[:50]}'",
+                file_path=file_path,
+                snippet=snippet,
+                line=line,
+                details={'phrase': match.group()}
+            ))
+
+        return findings
+
+
+class RuleOfThreeChecker(RuleChecker):
+    """Check for overuse of the 'rule of three' pattern.
+
+    LLMs overuse 'adjective, adjective, and adjective' and 'phrase, phrase,
+    and phrase' constructions to make superficial analyses appear more comprehensive.
+    """
+
+    DEFAULT_PATTERNS = [
+        # Three adjectives
+        r'\b(\w+),\s+(\w+),?\s+and\s+(\w+)\s+(approach|method|system|framework|strategy|solution|model|perspective)\b',
+        # Three nouns/phrases with repetitive structure
+        r'\b(\w+\s+\w+),\s+(\w+\s+\w+),?\s+and\s+(\w+\s+\w+)\b',
+    ]
+
+    def check(self, text: str, raw_text: str, file_path: str, metadata: Dict[str, Any]) -> List[Finding]:
+        findings = []
+        patterns = self.config.get('patterns', self.DEFAULT_PATTERNS)
+        threshold = self.config.get('threshold_count', 3)
+
+        all_matches = []
+
+        for pattern_str in patterns:
+            pattern = re.compile(pattern_str, re.IGNORECASE)
+            matches = list(pattern.finditer(text))
+            all_matches.extend(matches)
+
+        if len(all_matches) >= threshold:
+            match = all_matches[0]
+            snippet = get_context_snippet(text, match.start(), match.end())
+            line = calculate_line_number(raw_text, match.start())
+
+            findings.append(Finding(
+                rule_id=self.rule_id,
+                severity='WARN',
+                message=f"Overuse of 'rule of three': {len(all_matches)} instances of formulaic X, Y, and Z patterns",
+                file_path=file_path,
+                snippet=snippet,
+                line=line,
+                details={'count': len(all_matches)}
+            ))
+
+        return findings
+
+
+class ChallengesConclusionsChecker(RuleChecker):
+    """Check for outline-like conclusions about challenges and future prospects.
+
+    LLM-generated articles often include a 'Challenges' section with formulaic
+    'Despite its [positive], [subject] faces challenges...' followed by vaguely
+    positive assessments.
+    """
+
+    DEFAULT_PATTERNS = [
+        # Despite its...faces challenges
+        r'\b[Dd]espite\s+(its|their|the)\s+[\w\s,]+faces?\s+(several\s+)?(challenges?|obstacles?|difficulties?)\b',
+        # Challenges and Legacy/Future sections
+        r'\b(Challenges?\s+and\s+(Legacy|Future|Prospects?)|Future\s+(Outlook|Prospects?))\b',
+        # Despite these challenges...continues to
+        r'\b[Dd]espite\s+these\s+(challenges?|obstacles?),?[\w\s,]+continues?\s+to\b',
+        # Future investments/developments
+        r'\b[Ff]uture\s+(investments?|developments?|initiatives?)\s+[\w\s,]+could\s+(enhance|improve|maintain)\b',
+    ]
+
+    def check(self, text: str, raw_text: str, file_path: str, metadata: Dict[str, Any]) -> List[Finding]:
+        findings = []
+        patterns = self.config.get('patterns', self.DEFAULT_PATTERNS)
+
+        all_matches = []
+
+        for pattern_str in patterns:
+            pattern = re.compile(pattern_str, re.IGNORECASE)
+            matches = list(pattern.finditer(text))
+            all_matches.extend(matches)
+
+        if all_matches:
+            match = all_matches[0]
+            snippet = get_context_snippet(text, match.start(), match.end())
+            line = calculate_line_number(raw_text, match.start())
+
+            severity = 'FAIL' if len(all_matches) >= 2 else 'WARN'
+
+            findings.append(Finding(
+                rule_id=self.rule_id,
+                severity=severity,
+                message=f"Formulaic challenges/conclusions section detected: {len(all_matches)} AI-style outline patterns",
+                file_path=file_path,
+                snippet=snippet,
+                line=line,
+                details={'count': len(all_matches)}
+            ))
+
+        return findings
+
+
+class KnowledgeCutoffChecker(RuleChecker):
+    """Check for knowledge-cutoff disclaimers and speculation about missing information.
+
+    LLMs often output disclaimers about their knowledge cutoff or state that
+    'specific details are limited' even when they're fabricating this claim.
+    """
+
+    DEFAULT_PATTERNS = [
+        # As of date disclaimers
+        r'\b[Aa]s\s+of\s+(my\s+)?(last\s+)?(knowledge\s+)?(update|training|information)\b',
+        r'\b[Uu]p\s+to\s+my\s+last\s+(training\s+)?(update|knowledge)\b',
+        # Information limited/scarce
+        r'\b([Ww]hile|[Aa]lthough)\s+(specific\s+)?(details?|information)\s+(is|are|remains?)\s+(limited|scarce|not\s+widely|not\s+extensively)\b',
+        # Not documented/available
+        r'\b(is\s+)?not\s+(widely\s+)?(documented|available|disclosed|known)\b',
+        # Based on available information
+        r'\b[Bb]ased\s+on\s+(available|provided|current)\s+(information|sources|data)\b',
+        # Maintains privacy/keeps private
+        r'\b(maintains?|keeps?)\s+(a\s+low\s+profile|personal\s+details\s+private|much\s+of\s+.+\s+private)\b',
+    ]
+
+    def check(self, text: str, raw_text: str, file_path: str, metadata: Dict[str, Any]) -> List[Finding]:
+        findings = []
+        patterns = self.config.get('patterns', self.DEFAULT_PATTERNS)
+
+        all_matches = []
+
+        for pattern_str in patterns:
+            pattern = re.compile(pattern_str, re.IGNORECASE)
+            matches = list(pattern.finditer(text))
+            all_matches.extend(matches)
+
+        # Each instance is quite distinctive
+        for match in all_matches[:3]:
+            snippet = get_context_snippet(text, match.start(), match.end())
+            line = calculate_line_number(raw_text, match.start())
+
+            findings.append(Finding(
+                rule_id=self.rule_id,
+                severity='FAIL',
+                message=f"Knowledge cutoff disclaimer: '{match.group()}'",
+                file_path=file_path,
+                snippet=snippet,
+                line=line,
+                details={'phrase': match.group()}
+            ))
+
+        return findings
+
+
+class VagueAttributionChecker(RuleChecker):
+    """Check for vague attributions and weasel wording.
+
+    AI chatbots tend to attribute opinions or claims to vague authorities
+    like 'observers note' or 'experts argue' without specific citations.
+    """
+
+    DEFAULT_PATTERNS = [
+        # Vague authorities
+        r'\b([Oo]bservers?|[Ee]xperts?|[Aa]nalysts?|[Ss]cholars?|[Rr]esearchers?)\s+(have\s+)?(noted|cited|argued|suggested|observed|pointed\s+out)\b',
+        # Industry reports/studies
+        r'\b[Ii]ndustry\s+(reports?|studies?|analyses?)\s+(suggest|indicate|show)\b',
+        # Some critics/sources
+        r'\b[Ss]ome\s+(critics?|sources?|publications?|reviewers?)\s+(argue|suggest|note|claim)\b',
+        # Several sources when few cited
+        r'\b[Ss]everal\s+(sources?|publications?|studies?)\s+(have\s+)?(cited|noted|described)\b',
+        # Have been described as
+        r'\b(has|have)\s+been\s+(described|characterized|noted|cited)\s+as\b',
+        # According to research/studies (vague)
+        r'\b[Aa]ccording\s+to\s+(research|studies?)\b(?!\s+by\s+\w)',  # Without specific attribution
+    ]
+
+    def check(self, text: str, raw_text: str, file_path: str, metadata: Dict[str, Any]) -> List[Finding]:
+        findings = []
+        patterns = self.config.get('patterns', self.DEFAULT_PATTERNS)
+        threshold = self.config.get('threshold_count', 2)
+
+        all_matches = []
+
+        for pattern_str in patterns:
+            pattern = re.compile(pattern_str, re.IGNORECASE)
+            matches = list(pattern.finditer(text))
+            all_matches.extend(matches)
+
+        if len(all_matches) >= threshold:
+            match = all_matches[0]
+            snippet = get_context_snippet(text, match.start(), match.end())
+            line = calculate_line_number(raw_text, match.start())
+
+            findings.append(Finding(
+                rule_id=self.rule_id,
+                severity='WARN',
+                message=f"Vague attribution/weasel wording: {len(all_matches)} instances of uncited claims to vague authorities",
+                file_path=file_path,
+                snippet=snippet,
+                line=line,
+                details={'count': len(all_matches)}
+            ))
+
+        return findings
+
+
+class NotabilityEmphasisChecker(RuleChecker):
+    """Check for overemphasis on notability and media coverage.
+
+    LLMs act as if the best way to prove notability is to hit readers over the head
+    with claims of notability, often listing sources that covered the subject.
+    """
+
+    DEFAULT_PATTERNS = [
+        # Independent coverage (Wikipedia-specific language)
+        r'\b[Ii]ndependent\s+coverage\b',
+        # Media outlets listing
+        r'\b(local|regional|national|international)\s+media\s+outlets?\b',
+        r'\b(music|business|tech|entertainment)\s+outlets?\b',
+        # Featured in multiple outlets
+        r'\b[Ff]eatured\s+in\s+[\w\s,]+and\s+other\s+(prominent\s+)?(media\s+)?outlets?\b',
+        # Coverage mentioned extensively
+        r'\b(has\s+been\s+)?(mentioned|featured|covered|cited)\s+in\s+\w+[\w\s,]+and\s+\w+',
+        # Active social media presence
+        r'\b(maintains?|has)\s+(an\s+)?active\s+social\s+media\s+presence\b',
+        # Written by leading expert
+        r'\b[Ww]ritten\s+by\s+(a\s+)?leading\s+(expert|authority|scholar)\b',
+    ]
+
+    def check(self, text: str, raw_text: str, file_path: str, metadata: Dict[str, Any]) -> List[Finding]:
+        findings = []
+        patterns = self.config.get('patterns', self.DEFAULT_PATTERNS)
+        threshold = self.config.get('threshold_count', 2)
+
+        all_matches = []
+
+        for pattern_str in patterns:
+            pattern = re.compile(pattern_str, re.IGNORECASE)
+            matches = list(pattern.finditer(text))
+            all_matches.extend(matches)
+
+        if len(all_matches) >= threshold:
+            match = all_matches[0]
+            snippet = get_context_snippet(text, match.start(), match.end())
+            line = calculate_line_number(raw_text, match.start())
+
+            findings.append(Finding(
+                rule_id=self.rule_id,
+                severity='WARN',
+                message=f"Overemphasis on notability: {len(all_matches)} instances claiming media coverage/importance",
+                file_path=file_path,
+                snippet=snippet,
+                line=line,
+                details={'count': len(all_matches)}
+            ))
+
+        return findings
+
+
 class RuleRegistry:
     """Registry of all available rule checkers."""
 
     CHECKER_MAP = {
+        # Original generic writing quality rules
         'banned-words': BannedWordsChecker,
         'weak-phrases': WeakPhrasesChecker,
         'adverbs': AdverbsChecker,
@@ -560,6 +1164,19 @@ class RuleRegistry:
         'sentence-variance': SentenceLengthVarianceChecker,
         'passive-voice': PassiveVoiceChecker,
         'repetition': RepetitionChecker,
+
+        # Wikipedia AI detection patterns
+        'ai-vocabulary': AIVocabularyChecker,
+        'significance-language': SignificanceLanguageChecker,
+        'promotional-language': PromotionalLanguageChecker,
+        'superficial-analysis': SuperficialAnalysisChecker,
+        'copulative-avoidance': CopulativeAvoidanceChecker,
+        'negative-parallelism': NegativeParallelismChecker,
+        'rule-of-three': RuleOfThreeChecker,
+        'challenges-conclusions': ChallengesConclusionsChecker,
+        'knowledge-cutoff': KnowledgeCutoffChecker,
+        'vague-attribution': VagueAttributionChecker,
+        'notability-emphasis': NotabilityEmphasisChecker,
     }
 
     @classmethod

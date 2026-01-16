@@ -1,0 +1,96 @@
+{
+  "summary": {
+    "total_files": 1,
+    "total_findings": 8,
+    "severity_counts": {
+      "PASS": 0,
+      "WARN": 5,
+      "FAIL": 3
+    },
+    "top_rules": {
+      "banned-words": 3,
+      "weak-phrases": 2,
+      "stacked-intensifiers": 1,
+      "conjunction-starts": 1,
+      "repetition": 1
+    },
+    "category_counts": {}
+  },
+  "files": {
+    "examples/sample-content.md": [
+      {
+        "rule_id": "banned-words",
+        "severity": "FAIL",
+        "message": "Overuse of 'really': 5 occurrences (15.2 per 1,000 words)",
+        "file_path": "examples/sample-content.md",
+        "snippet": "...going to be a really great article. Actually...",
+        "line": 7,
+        "details": {
+          "word": "really",
+          "count": 5,
+          "rate": 15.2
+        }
+      },
+      {
+        "rule_id": "banned-words",
+        "severity": "WARN",
+        "message": "Overuse of 'pretty': 2 occurrences (6.1 per 1,000 words)",
+        "file_path": "examples/sample-content.md",
+        "snippet": "...the content is pretty interesting, and I believe...",
+        "line": 7,
+        "details": {
+          "word": "pretty",
+          "count": 2,
+          "rate": 6.1
+        }
+      },
+      {
+        "rule_id": "weak-phrases",
+        "severity": "FAIL",
+        "message": "Weak phrase: 'I think'",
+        "file_path": "examples/sample-content.md",
+        "snippet": "I think that this is going to be...",
+        "line": 7,
+        "details": {
+          "phrase": "I think",
+          "assertive_context": true
+        }
+      },
+      {
+        "rule_id": "stacked-intensifiers",
+        "severity": "FAIL",
+        "message": "Stacked intensifier: 'Really very quickly'",
+        "file_path": "examples/sample-content.md",
+        "snippet": "Really very quickly, we can see...",
+        "line": 19,
+        "details": {
+          "phrase": "Really very quickly"
+        }
+      },
+      {
+        "rule_id": "conjunction-starts",
+        "severity": "FAIL",
+        "message": "4 consecutive sentences start with conjunctions",
+        "file_path": "examples/sample-content.md",
+        "snippet": "And another thing to consider...",
+        "line": 13,
+        "details": {
+          "consecutive_count": 4
+        }
+      },
+      {
+        "rule_id": "repetition",
+        "severity": "WARN",
+        "message": "Word 'productivity' repeated 6 times in 150-word window",
+        "file_path": "examples/sample-content.md",
+        "snippet": "The productivity system is designed...",
+        "line": 23,
+        "details": {
+          "word": "productivity",
+          "count": 6,
+          "window_size": 150
+        }
+      }
+    ]
+  }
+}

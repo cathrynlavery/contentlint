@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "contentlint"
+version = "1.0.0"
+description = "ESLint for writing - scan content files for AI-tells and weak prose patterns"
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [
+    {name = "BestSelf Co", email = "engineering@bestselfco.com"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Quality Assurance",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "typer>=0.9.0",
+    "pyyaml>=6.0",
+    "beautifulsoup4>=4.12.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+contentlint = "contentlint.__main__:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["contentlint*"]

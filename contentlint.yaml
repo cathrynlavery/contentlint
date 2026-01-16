@@ -1,0 +1,187 @@
+# ContentLint Configuration
+# This file defines all linting rules for content quality checking
+
+version: "1.0"
+
+# Global settings
+settings:
+  # Exclude patterns (glob)
+  exclude:
+    - "**/node_modules/**"
+    - "**/vendor/**"
+    - "**/.git/**"
+
+  # File types to scan
+  file_types:
+    - .md
+    - .html
+    - .htm
+
+# Linting Rules
+# Each rule has:
+# - id: unique identifier
+# - enabled: true/false
+# - description: what the rule checks
+# - category: grouping for organization
+# - thresholds and configuration specific to each rule type
+
+rules:
+  # ============================================================================
+  # A) Word Choice / Filler
+  # ============================================================================
+
+  - id: banned-words
+    enabled: true
+    description: "Check for overuse of filler and weak words"
+    category: word-choice
+    banned_words:
+      - just
+      - that
+      - already
+      - actual
+      - actually
+      - think
+      - pretty
+      - really
+      - great
+      - around
+      - very
+      - thing
+      - much
+      - unfortunate
+      - unfortunate
+      - fortunate
+      - nice
+    # Thresholds per 1,000 words
+    fail_threshold_per_1000: 3
+    warn_threshold_per_1000: 2
+
+  - id: weak-phrases
+    enabled: true
+    description: "Check for weak qualifying phrases"
+    category: word-choice
+    phrases:
+      - "I think"
+      - "I believe"
+      - "it seems"
+      - "it appears"
+      - "sort of"
+      - "kind of"
+      - "somewhat"
+      - "in my opinion"
+    # FAIL if used in assertive context, WARN otherwise
+
+  # ============================================================================
+  # B) Adverbs
+  # ============================================================================
+
+  - id: adverbs
+    enabled: true
+    description: "Check for overuse of -ly adverbs"
+    category: adverbs
+    # Thresholds per 1,000 words
+    warn_threshold_per_1000: 8
+    fail_threshold_per_1000: 15
+
+  - id: stacked-intensifiers
+    enabled: true
+    description: "Check for stacked intensifiers (really/very + -ly word)"
+    category: adverbs
+    # Always FAIL on detection
+
+  # ============================================================================
+  # C) Transitions / AI Cadence
+  # ============================================================================
+
+  - id: transitions
+    enabled: true
+    description: "Check for overuse of transition words"
+    category: transitions
+    transitions:
+      - moreover
+      - furthermore
+      - in addition
+      - however
+      - on the other hand
+      - nevertheless
+      - consequently
+      - therefore
+      - thus
+    # Threshold per 1,000 words
+    threshold_per_1000: 4
+
+  # ============================================================================
+  # D) Sentence Mechanics
+  # ============================================================================
+
+  - id: conjunction-starts
+    enabled: true
+    description: "Check for sentences starting with conjunctions"
+    category: sentence-mechanics
+    conjunctions:
+      - and
+      - but
+      - so
+      - because
+      - however
+      - yet
+      - or
+    # WARN if > threshold_percent of sentences start with conjunctions
+    threshold_percent: 20
+    # FAIL if consecutive_threshold or more sentences in a row start with conjunctions
+    consecutive_threshold: 3
+
+  - id: vague-this
+    enabled: true
+    description: "Check for vague 'this' at sentence start"
+    category: sentence-mechanics
+    # WARN when sentence starts with "This is/means/suggests/etc"
+
+  - id: sentence-variance
+    enabled: true
+    description: "Check sentence length variance (burstiness)"
+    category: sentence-mechanics
+    # WARN if threshold_percent of sentences fall within a 10-word band
+    threshold_percent: 70
+
+  # ============================================================================
+  # E) Passive Voice
+  # ============================================================================
+
+  - id: passive-voice
+    enabled: true
+    description: "Check for passive voice usage (heuristic)"
+    category: voice
+    # WARN if passive sentences > threshold_percent
+    threshold_percent: 12
+
+  # ============================================================================
+  # F) Repetition
+  # ============================================================================
+
+  - id: repetition
+    enabled: true
+    description: "Check for repeated words within paragraphs"
+    category: repetition
+    # WARN if any non-stopword repeats > threshold_count within window_words
+    threshold_count: 4
+    window_words: 150
+
+# Directory-specific overrides (optional)
+# These allow you to have different thresholds for different content types
+overrides:
+  # Example: More lenient for blog posts
+  - path: "blog/**"
+    rules:
+      banned-words:
+        fail_threshold_per_1000: 4
+        warn_threshold_per_1000: 3
+
+  # Example: Stricter for marketing copy
+  - path: "marketing/**"
+    rules:
+      banned-words:
+        fail_threshold_per_1000: 2
+        warn_threshold_per_1000: 1
+      passive-voice:
+        threshold_percent: 8

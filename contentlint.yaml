@@ -309,6 +309,60 @@ rules:
     # using Wikipedia-specific language like "independent coverage"
     threshold_count: 2  # WARN at 2+
 
+  # ============================================================================
+  # H) Conversational AI Detection Patterns
+  # For blog posts, marketing content, and listicles
+  # These patterns differ from encyclopedic AI writing
+  # ============================================================================
+
+  - id: conversational-hooks
+    enabled: true
+    description: "Check for formulaic conversational hooks"
+    category: conversational-ai
+    # Phrases like "You know the feeling", "We've all been there"
+    # AI uses these to create artificial empathy/connection
+    threshold_count: 2  # WARN at 2+
+
+  - id: formulaic-empathy
+    enabled: true
+    description: "Check for formulaic emphasis phrases"
+    category: conversational-ai
+    # Phrases like "Here's the thing:", "The truth is:"
+    # AI uses these as transitions and for emphasis
+    threshold_count: 2  # WARN at 2+
+
+  - id: permission-giving
+    enabled: true
+    description: "Check for permission-giving language"
+    category: conversational-ai
+    # Phrases like "It's okay to", "That's normal"
+    # AI reassures readers in repetitive ways
+    threshold_count: 3  # WARN at 3+
+
+  - id: meta-commentary
+    enabled: true
+    description: "Check for meta-commentary about the content"
+    category: conversational-ai
+    # Phrases like "I've compiled", "Before you scroll"
+    # Self-referential statements about what the content is doing
+    threshold_count: 2  # WARN at 2+
+
+  - id: parallel-emphasis
+    enabled: true
+    description: "Check for parallel sentence structures for emphasis"
+    category: conversational-ai
+    # Adjacent sentences with same verb structure
+    # "X creates Y. Z creates Y." pattern for impact
+    # WARN at 2+ instances
+
+  - id: section-transitions
+    enabled: true
+    description: "Check for formulaic section transitions"
+    category: conversational-ai
+    # Phrases like "Now what?", "Here's how:", "The goal:"
+    # Predictable AI transitions between sections
+    threshold_count: 2  # WARN at 2+
+
 # Directory-specific overrides (optional)
 # These allow you to have different thresholds for different content types
 overrides:

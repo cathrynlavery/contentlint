@@ -54,10 +54,13 @@ contentlint init
 
 ## What ContentLint Detects
 
-ContentLint implements two categories of checks:
+ContentLint implements three categories of checks:
 
-1. **Wikipedia AI Detection Patterns** - Distinctive patterns that appeared in text after late 2023, based on rigorous linguistic research
-2. **General Writing Quality Rules** - Traditional writing quality checks for clarity and conciseness
+1. **Wikipedia AI Detection Patterns** - Formal/encyclopedic AI writing patterns based on rigorous linguistic research
+2. **Conversational AI Detection Patterns** - Blog/marketing/listicle AI patterns with different tells
+3. **General Writing Quality Rules** - Traditional writing quality checks for clarity and conciseness
+
+**Important:** AI writes in different styles. Wikipedia's patterns catch formal encyclopedic AI (significance language, promotional puffery). Our conversational patterns catch blog/marketing AI (empathy hooks, meta-commentary). Both are needed for comprehensive detection.
 
 ### Wikipedia AI Detection Patterns
 
@@ -243,6 +246,109 @@ Detects AI's tendency to "prove" notability by listing media coverage:
 - "written by a leading expert"
 
 **Why distinctive:** Uses Wikipedia's own notability guidelines language, but in article text rather than talk pages.
+
+**Threshold:** WARN if 2+ instances
+
+---
+
+### Conversational AI Detection Patterns
+
+Wikipedia's patterns detect formal/encyclopedic AI writing. But AI also generates blog posts, listicles, and marketing content with different tells. These patterns catch conversational AI writing.
+
+#### L) Conversational Hooks
+
+Detects formulaic empathy phrases AI uses to create artificial connection:
+
+**Common patterns:**
+- "You know the feeling"
+- "You know what I mean"
+- "You've been there"
+- "We've all been there"
+- "Let's be honest"
+- "Admit it"
+- "Sound familiar?"
+- "I get it"
+
+**Why distinctive:** Human writers use these occasionally, but AI overuses them as a formula to establish rapport without actually understanding reader experience.
+
+**Threshold:** WARN if 2+ instances
+
+#### M) Formulaic Empathy/Emphasis
+
+Detects AI's predictable transition and emphasis phrases:
+
+**Common patterns:**
+- "Here's the thing:"
+- "The truth is:"
+- "Here's what you need to know:"
+- "The reality is:"
+- "Here's why:"
+- "The bottom line is:"
+- "What this means:"
+
+**Why distinctive:** These phrases create false emphasis. They signal "pay attention" without adding substance.
+
+**Threshold:** WARN if 2+ instances
+
+#### N) Permission-Giving Language
+
+Detects AI's tendency to reassure readers repetitively:
+
+**Common patterns:**
+- "It's okay to..."
+- "That's okay/normal/fine."
+- "Don't worry."
+- "No need to..."
+- "You don't have to..."
+- "It's perfectly normal"
+
+**Why distinctive:** AI uses reassurance as filler. Human writers give permission more sparingly and contextually.
+
+**Threshold:** WARN if 3+ instances
+
+#### O) Meta-Commentary
+
+Detects self-referential statements about the content:
+
+**Common patterns:**
+- "I've compiled/gathered/collected"
+- "Before you scroll/read"
+- "Want a ready-made..."
+- "In this article/post/guide"
+- "Below you'll find"
+- "I'm going to show you"
+- "Keep reading to discover"
+
+**Why distinctive:** AI explicitly tells you what it's doing. Human writers usually just do it.
+
+**Threshold:** WARN if 2+ instances
+
+#### P) Parallel Emphasis Structures
+
+Detects parallel sentence structures used for artificial impact:
+
+**Pattern:** Adjacent sentences with identical verb structures
+- "Surface conversations maintain relationships. Deep conversations transform them."
+- "X creates Y. Z creates Y."
+
+**Why distinctive:** AI loves this rhetorical device for creating "impact" that feels manufactured rather than earned.
+
+**Threshold:** WARN if 2+ instances
+
+#### Q) Formulaic Section Transitions
+
+Detects predictable transitions between sections:
+
+**Common patterns:**
+- "Now what?"
+- "Here's how:"
+- "The goal:"
+- "So what does this mean?"
+- "What does this look like?"
+- "Let's break it down"
+- "Here's what you need to know"
+
+**Why distinctive:** AI uses these as structural scaffolding. The transitions are so predictable they become tells.
 
 **Threshold:** WARN if 2+ instances
 

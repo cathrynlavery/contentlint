@@ -1149,6 +1149,338 @@ class NotabilityEmphasisChecker(RuleChecker):
         return findings
 
 
+class ConversationalHooksChecker(RuleChecker):
+    """Check for formulaic conversational hooks common in AI blog/marketing content.
+
+    AI-generated conversational content often uses these empathy-signaling phrases
+    to create artificial connection with readers.
+    """
+
+    DEFAULT_PATTERNS = [
+        # You know patterns
+        r'\b[Yy]ou know (the feeling|what I mean|how it (is|goes)|that feeling when)\b',
+        r'\b[Yy]ou\'ve (probably )?been there\b',
+        r'\b[Ww]e\'ve all been there\b',
+        # Let's be honest/real
+        r'\b[Ll]et\'s be (honest|real|clear)\b',
+        # Admit it
+        r'\b[Aa]dmit it[,:]',
+        # Sound familiar
+        r'\b[Ss]ound familiar\??',
+        # I get it
+        r'\b[Ii] (totally )?get it\b',
+    ]
+
+    def check(self, text: str, raw_text: str, file_path: str, metadata: Dict[str, Any]) -> List[Finding]:
+        findings = []
+        patterns = self.config.get('patterns', self.DEFAULT_PATTERNS)
+        threshold = self.config.get('threshold_count', 2)
+
+        all_matches = []
+
+        for pattern_str in patterns:
+            pattern = re.compile(pattern_str, re.IGNORECASE)
+            matches = list(pattern.finditer(text))
+            all_matches.extend(matches)
+
+        if len(all_matches) >= threshold:
+            match = all_matches[0]
+            snippet = get_context_snippet(text, match.start(), match.end())
+            line = calculate_line_number(raw_text, match.start())
+
+            findings.append(Finding(
+                rule_id=self.rule_id,
+                severity='WARN',
+                message=f"Conversational AI hooks: {len(all_matches)} instances of formulaic empathy phrases",
+                file_path=file_path,
+                snippet=snippet,
+                line=line,
+                details={'count': len(all_matches), 'phrases': [m.group() for m in all_matches[:5]]}
+            ))
+
+        return findings
+
+
+class FormulicEmpathyChecker(RuleChecker):
+    """Check for formulaic transition/emphasis phrases in conversational AI.
+
+    These phrases are overused in AI-generated blog content to create
+    emphasis or transition between sections.
+    """
+
+    DEFAULT_PATTERNS = [
+        # Here's the thing
+        r'\b[Hh]ere\'s the thing[,:]',
+        # The truth is
+        r'\b[Tt]he truth is[,:]',
+        # Here's what I know
+        r'\b[Hh]ere\'s what (I know|you need to know|matters)[,:]',
+        # The reality is
+        r'\b[Tt]he reality is[,:]',
+        # Here's why
+        r'\b[Hh]ere\'s why[,:]',
+        # The bottom line
+        r'\b[Tt]he bottom line is[,:]',
+        # What this means
+        r'\b[Ww]hat this (means|tells us)[,:]',
+    ]
+
+    def check(self, text: str, raw_text: str, file_path: str, metadata: Dict[str, Any]) -> List[Finding]:
+        findings = []
+        patterns = self.config.get('patterns', self.DEFAULT_PATTERNS)
+        threshold = self.config.get('threshold_count', 2)
+
+        all_matches = []
+
+        for pattern_str in patterns:
+            pattern = re.compile(pattern_str, re.IGNORECASE)
+            matches = list(pattern.finditer(text))
+            all_matches.extend(matches)
+
+        if len(all_matches) >= threshold:
+            match = all_matches[0]
+            snippet = get_context_snippet(text, match.start(), match.end())
+            line = calculate_line_number(raw_text, match.start())
+
+            findings.append(Finding(
+                rule_id=self.rule_id,
+                severity='WARN',
+                message=f"Formulaic emphasis phrases: {len(all_matches)} instances of AI transition patterns",
+                file_path=file_path,
+                snippet=snippet,
+                line=line,
+                details={'count': len(all_matches)}
+            ))
+
+        return findings
+
+
+class PermissionGivingChecker(RuleChecker):
+    """Check for permission-giving language common in AI-generated content.
+
+    AI often reassures readers with 'It's okay' or 'That's normal' phrases
+    in a formulaic, repetitive way.
+    """
+
+    DEFAULT_PATTERNS = [
+        # It's okay to
+        r'\b[Ii]t\'s (totally |completely )?okay to\b',
+        # That's okay/normal/fine
+        r'\b[Tt]hat\'s (okay|fine|normal|alright)[,\.]',
+        # Don't worry
+        r'\b[Dd]on\'t worry[,\.]',
+        # No need to
+        r'\b[Nn]o need to\b',
+        # You don't have to
+        r'\b[Yy]ou don\'t have to\b',
+        # It's perfectly normal
+        r'\b[Ii]t\'s (perfectly |completely )?(normal|fine|acceptable)\b',
+    ]
+
+    def check(self, text: str, raw_text: str, file_path: str, metadata: Dict[str, Any]) -> List[Finding]:
+        findings = []
+        patterns = self.config.get('patterns', self.DEFAULT_PATTERNS)
+        threshold = self.config.get('threshold_count', 3)
+
+        all_matches = []
+
+        for pattern_str in patterns:
+            pattern = re.compile(pattern_str, re.IGNORECASE)
+            matches = list(pattern.finditer(text))
+            all_matches.extend(matches)
+
+        if len(all_matches) >= threshold:
+            match = all_matches[0]
+            snippet = get_context_snippet(text, match.start(), match.end())
+            line = calculate_line_number(raw_text, match.start())
+
+            findings.append(Finding(
+                rule_id=self.rule_id,
+                severity='WARN',
+                message=f"Permission-giving language: {len(all_matches)} instances of reassurance patterns",
+                file_path=file_path,
+                snippet=snippet,
+                line=line,
+                details={'count': len(all_matches)}
+            ))
+
+        return findings
+
+
+class MetaCommentaryChecker(RuleChecker):
+    """Check for meta-commentary about the content itself.
+
+    AI-generated content often includes self-referential statements about
+    what it's doing or what the reader is about to see.
+    """
+
+    DEFAULT_PATTERNS = [
+        # I've compiled/gathered
+        r'\b[Ii]\'ve (compiled|gathered|collected|curated|put together)\b',
+        # Before you scroll/read
+        r'\b[Bb]efore you (scroll|read|dive in|get started)[,:]',
+        # Want a ready-made
+        r'\b[Ww]ant a (ready-made|quick|simple)\b',
+        # In this article/post
+        r'\b[Ii]n this (article|post|guide|piece)[,:]',
+        # Below you'll find
+        r'\b[Bb]elow you\'ll find\b',
+        # I'm going to show you
+        r'\b[Ii]\'m going to (show|teach|walk you through|share)\b',
+        # Keep reading to discover
+        r'\b[Kk]eep reading to (discover|learn|find out)\b',
+    ]
+
+    def check(self, text: str, raw_text: str, file_path: str, metadata: Dict[str, Any]) -> List[Finding]:
+        findings = []
+        patterns = self.config.get('patterns', self.DEFAULT_PATTERNS)
+        threshold = self.config.get('threshold_count', 2)
+
+        all_matches = []
+
+        for pattern_str in patterns:
+            pattern = re.compile(pattern_str, re.IGNORECASE)
+            matches = list(pattern.finditer(text))
+            all_matches.extend(matches)
+
+        if len(all_matches) >= threshold:
+            match = all_matches[0]
+            snippet = get_context_snippet(text, match.start(), match.end())
+            line = calculate_line_number(raw_text, match.start())
+
+            findings.append(Finding(
+                rule_id=self.rule_id,
+                severity='WARN',
+                message=f"Meta-commentary: {len(all_matches)} self-referential statements about the content",
+                file_path=file_path,
+                snippet=snippet,
+                line=line,
+                details={'count': len(all_matches)}
+            ))
+
+        return findings
+
+
+class ParallelEmphasisChecker(RuleChecker):
+    """Check for parallel sentence structures used for emphasis.
+
+    AI loves creating impact with parallel structures like:
+    'X does Y. Z does Y.' or 'A creates B. C creates D.'
+    """
+
+    DEFAULT_PATTERNS = [
+        # Pattern: [Noun] [verb]. [Noun] [verb].
+        # Looking for sentences with same verb structure
+        r'(\b\w+ \w+s \w+)\.\s+(\b\w+ \w+s \w+)\.',
+        # Pattern: [Noun] creates/builds/makes. [Noun] creates/builds/makes.
+        r'(\b\w+ (creates?|builds?|makes?) \w+)\.\s+(\b\w+ (creates?|builds?|makes?) \w+)\.',
+    ]
+
+    def check(self, text: str, raw_text: str, file_path: str, metadata: Dict[str, Any]) -> List[Finding]:
+        findings = []
+
+        # Look for adjacent sentences with similar verb structures
+        sentences = split_sentences(text)
+
+        parallel_count = 0
+        first_match_pos = None
+
+        for i in range(len(sentences) - 1):
+            sent1 = sentences[i].strip()
+            sent2 = sentences[i + 1].strip()
+
+            # Extract verb patterns (simplified heuristic)
+            # Look for: subject verb object patterns
+            pattern = r'\b(\w+)\s+(creates?|builds?|makes?|maintains?|transforms?|changes?|provides?|gives?)\s+(\w+)'
+
+            match1 = re.search(pattern, sent1, re.IGNORECASE)
+            match2 = re.search(pattern, sent2, re.IGNORECASE)
+
+            if match1 and match2:
+                verb1 = match1.group(2).lower()
+                verb2 = match2.group(2).lower()
+
+                # Check if verbs are the same or similar tense
+                if verb1 == verb2 or (verb1.rstrip('s') == verb2.rstrip('s')):
+                    parallel_count += 1
+                    if first_match_pos is None:
+                        # Find position in original text
+                        first_match_pos = text.find(sent1)
+
+        if parallel_count >= 2:
+            if first_match_pos is not None:
+                snippet = get_context_snippet(text, first_match_pos, first_match_pos + 100)
+                line = calculate_line_number(raw_text, first_match_pos)
+            else:
+                snippet = text[:100]
+                line = 1
+
+            findings.append(Finding(
+                rule_id=self.rule_id,
+                severity='WARN',
+                message=f"Parallel emphasis structures: {parallel_count} instances of formulaic sentence parallelism",
+                file_path=file_path,
+                snippet=snippet,
+                line=line,
+                details={'count': parallel_count}
+            ))
+
+        return findings
+
+
+class SectionTransitionChecker(RuleChecker):
+    """Check for formulaic section transitions in AI content.
+
+    AI often uses predictable transitions like 'Now what?', 'Here's how:', etc.
+    """
+
+    DEFAULT_PATTERNS = [
+        # Now what
+        r'\b[Nn]ow what\?',
+        # Here's how
+        r'\b[Hh]ere\'s how[,:]',
+        # The goal
+        r'\b[Tt]he goal[,:]',
+        # So what does this mean
+        r'\b[Ss]o what does (this|that) mean\?',
+        # What does this look like
+        r'\b[Ww]hat does (this|that) look like\?',
+        # Let's break it down
+        r'\b[Ll]et\'s break (it|this|that) down\b',
+        # Here's what you need to know
+        r'\b[Hh]ere\'s what you need to know\b',
+    ]
+
+    def check(self, text: str, raw_text: str, file_path: str, metadata: Dict[str, Any]) -> List[Finding]:
+        findings = []
+        patterns = self.config.get('patterns', self.DEFAULT_PATTERNS)
+        threshold = self.config.get('threshold_count', 2)
+
+        all_matches = []
+
+        for pattern_str in patterns:
+            pattern = re.compile(pattern_str, re.IGNORECASE)
+            matches = list(pattern.finditer(text))
+            all_matches.extend(matches)
+
+        if len(all_matches) >= threshold:
+            match = all_matches[0]
+            snippet = get_context_snippet(text, match.start(), match.end())
+            line = calculate_line_number(raw_text, match.start())
+
+            findings.append(Finding(
+                rule_id=self.rule_id,
+                severity='WARN',
+                message=f"Formulaic transitions: {len(all_matches)} AI-style section transitions",
+                file_path=file_path,
+                snippet=snippet,
+                line=line,
+                details={'count': len(all_matches)}
+            ))
+
+        return findings
+
+
 class RuleRegistry:
     """Registry of all available rule checkers."""
 
@@ -1165,7 +1497,7 @@ class RuleRegistry:
         'passive-voice': PassiveVoiceChecker,
         'repetition': RepetitionChecker,
 
-        # Wikipedia AI detection patterns
+        # Wikipedia AI detection patterns (encyclopedic/formal)
         'ai-vocabulary': AIVocabularyChecker,
         'significance-language': SignificanceLanguageChecker,
         'promotional-language': PromotionalLanguageChecker,
@@ -1177,6 +1509,14 @@ class RuleRegistry:
         'knowledge-cutoff': KnowledgeCutoffChecker,
         'vague-attribution': VagueAttributionChecker,
         'notability-emphasis': NotabilityEmphasisChecker,
+
+        # Conversational AI detection patterns (blog/marketing)
+        'conversational-hooks': ConversationalHooksChecker,
+        'formulaic-empathy': FormulicEmpathyChecker,
+        'permission-giving': PermissionGivingChecker,
+        'meta-commentary': MetaCommentaryChecker,
+        'parallel-emphasis': ParallelEmphasisChecker,
+        'section-transitions': SectionTransitionChecker,
     }
 
     @classmethod
